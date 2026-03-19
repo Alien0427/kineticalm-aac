@@ -120,28 +120,39 @@ export default function KinetiCalmCursor({ nosePosRef }) {
   }, [nosePosRef, svgControls])
 
   return (
-    <div className="pointer-events-none fixed inset-0 z-[100] overflow-hidden">
+    <div 
+      className="pointer-events-none fixed inset-0 z-[100] overflow-hidden"
+      style={{ pointerEvents: 'none' }}
+    >
       
       {/* Raw Jittery Red Dot */}
       <div
         ref={rawCursorRef}
-        className="absolute top-0 left-0 w-3 h-3 bg-red-500 rounded-full opacity-60 shadow-[0_0_12px_rgba(239,68,68,0.8)] pointer-events-none will-change-transform"
-        style={{ transform: `translate3d(-50%, -50%, 0)` }}
+        className="pointer-events-none absolute top-0 left-0 w-3 h-3 bg-red-500 rounded-full opacity-60 shadow-[0_0_12px_rgba(239,68,68,0.8)] will-change-transform"
+        style={{ transform: `translate3d(-50%, -50%, 0)`, pointerEvents: 'none' }}
         aria-hidden="true"
       />
       
       {/* Smoothed Cursor Container */}
       <div
         ref={smoothCursorRef}
-        className="absolute top-0 left-0 w-16 h-16 pointer-events-none will-change-transform flex justify-center items-center"
-        style={{ transform: `translate3d(-50%, -50%, 0)` }}
+        className="pointer-events-none absolute top-0 left-0 w-16 h-16 will-change-transform flex justify-center items-center"
+        style={{ transform: `translate3d(-50%, -50%, 0)`, pointerEvents: 'none' }}
         aria-hidden="true"
       >
         {/* The visual inner ring */}
-        <div className="absolute inset-0 border-[3px] border-cyan-400/40 bg-cyan-400/10 rounded-full backdrop-blur-[1px] shadow-[0_0_20px_rgba(34,211,238,0.3)]" />
+        <div 
+          className="pointer-events-none absolute inset-0 border-[3px] border-cyan-400/40 bg-cyan-400/10 rounded-full backdrop-blur-[1px] shadow-[0_0_20px_rgba(34,211,238,0.3)]" 
+          style={{ pointerEvents: 'none' }}
+        />
         
         {/* The animated progressive SVG fill ring */}
-        <svg width="64" height="64" className="absolute inset-0 -rotate-90">
+        <svg 
+          width="64" 
+          height="64" 
+          className="pointer-events-none absolute inset-0 -rotate-90"
+          style={{ pointerEvents: 'none' }}
+        >
           <motion.circle
             cx="32"
             cy="32"
@@ -153,11 +164,16 @@ export default function KinetiCalmCursor({ nosePosRef }) {
             strokeDasharray={CIRCUMFERENCE}
             animate={svgControls}
             initial={{ strokeDashoffset: CIRCUMFERENCE }}
+            className="pointer-events-none"
+            style={{ pointerEvents: 'none' }}
           />
         </svg>
 
         {/* Center pinpoint */}
-        <div className="w-1.5 h-1.5 bg-cyan-300 rounded-full shadow-[0_0_8px_rgba(34,211,238,1)] z-10" />
+        <div 
+          className="pointer-events-none w-1.5 h-1.5 bg-cyan-300 rounded-full shadow-[0_0_8px_rgba(34,211,238,1)] z-10" 
+          style={{ pointerEvents: 'none' }}
+        />
       </div>
 
     </div>

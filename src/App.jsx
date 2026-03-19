@@ -76,7 +76,7 @@ export default function App() {
 
   // Hardware Tracking Setup
   const videoRef = useRef(null)
-  const nosePosRef = useFaceTracking(videoRef)
+  const { nosePosRef, isTracking, startTracking } = useFaceTracking(videoRef)
 
   // 🧪 [TESTING BACKDOOR] Expose synthetic coordinate overriding to Playwright
   useEffect(() => {
@@ -136,9 +136,19 @@ export default function App() {
               >
                 Tremor Tracking Feed
               </h2>
-              <span className="text-xs px-3 py-1.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 font-medium">
-                Setup Required
-              </span>
+              {!isTracking ? (
+                <button
+                  onClick={startTracking}
+                  className="px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-gray-950 font-bold rounded-xl transition-colors shadow-[0_0_15px_rgba(6,182,212,0.4)]"
+                  aria-label="Start tracking your face and initialize camera"
+                >
+                  Start Tracking
+                </button>
+              ) : (
+                <span className="text-xs px-3 py-1.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-medium">
+                  Tracking Active
+                </span>
+              )}
             </div>
             <WebcamFeed />
           </section>
