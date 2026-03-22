@@ -73,10 +73,18 @@ const cardVariants = {
 export default function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [aacCards] = useState(INITIAL_AAC_CARDS)
+  const [isCameraLoading, setIsCameraLoading] = useState(false)
 
   // Hardware Tracking Setup
   const videoRef = useRef(null)
   const { nosePosRef, isTracking, startTracking } = useFaceTracking(videoRef)
+
+  // Wrap startTracking to show a loading state while MediaPipe + camera initialise
+  const handleStartTracking = async () => {
+    setIsCameraLoading(true)
+    await startTracking()
+    setIsCameraLoading(false)
+  }
 
   // 🧪 [TESTING BACKDOOR] Expose synthetic coordinate overriding to Playwright
   useEffect(() => {
@@ -104,8 +112,7 @@ export default function App() {
 
   return (
     <div className="flex h-screen w-screen bg-gray-950 overflow-hidden" id="app-root">
-      {/* ── Hidden Video feed for MediaPipe ── */}
-      <video ref={videoRef} className="hidden" autoPlay playsInline muted />
+      {/* ── Video feed is now handled organically inside WebcamFeed.jsx ── */}
 
       {/* ── The Custom Dwell-to-Click Cursor ── */}
       <KinetiCalmCursor nosePosRef={nosePosRef} />
@@ -138,11 +145,12 @@ export default function App() {
               </h2>
               {!isTracking ? (
                 <button
-                  onClick={startTracking}
-                  className="px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-gray-950 font-bold rounded-xl transition-colors shadow-[0_0_15px_rgba(6,182,212,0.4)]"
+                  onClick={handleStartTracking}
+                  disabled={isCameraLoading}
+                  className="px-4 py-2 bg-cyan-500 hover:bg-cyan-400 disabled:bg-cyan-800 disabled:cursor-wait text-gray-950 font-bold rounded-xl transition-colors shadow-[0_0_15px_rgba(6,182,212,0.4)]"
                   aria-label="Start tracking your face and initialize camera"
                 >
-                  Start Tracking
+                  {isCameraLoading ? 'Initializing…' : 'Start Tracking'}
                 </button>
               ) : (
                 <span className="text-xs px-3 py-1.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-medium">
@@ -150,7 +158,7 @@ export default function App() {
                 </span>
               )}
             </div>
-            <WebcamFeed />
+            <WebcamFeed isTracking={isTracking} videoRef={videoRef} />
           </section>
 
           {/* ── Section divider ── */}

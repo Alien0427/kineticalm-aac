@@ -10,8 +10,9 @@ import { motion, useAnimation } from 'framer-motion'
  */
 export default function KinetiCalmCursor({ nosePosRef }) {
   // DOM Refs
+  const wrapperRef      = useRef(null)   // outermost overlay — hidden during hit-test
   const smoothCursorRef = useRef(null)
-  const rawCursorRef = useRef(null)
+  const rawCursorRef    = useRef(null)
 
   // Tracking history for SMA algorithm
   const historyX = useRef([])
@@ -68,11 +69,17 @@ export default function KinetiCalmCursor({ nosePosRef }) {
       }
 
       // 4. Dwell-to-Click Logic
-      // Only check if coordinates are valid numbers to prevent crashes
       if (!isNaN(avgX) && !isNaN(avgY)) {
-        // Find what element is beneath the smoothed cursor
+        // Briefly hide the cursor overlay so elementFromPoint punches through
+        // to the actual UI element beneath — without this, the overlay div
+        // itself (even with pointer-events:none) is returned as the top element.
+        if (wrapperRef.current) wrapperRef.current.style.visibility = 'hidden'
         const hoveredElement = document.elementFromPoint(avgX, avgY)
-        const dwellableElement = hoveredElement ? hoveredElement.closest('[data-dwellable="true"]') : null
+        if (wrapperRef.current) wrapperRef.current.style.visibility = 'visible'
+
+        const dwellableElement = hoveredElement
+          ? hoveredElement.closest('[data-dwellable="true"]')
+          : null
 
         if (dwellableElement) {
           if (dwellTargetRef.current !== dwellableElement) {
@@ -120,7 +127,8 @@ export default function KinetiCalmCursor({ nosePosRef }) {
   }, [nosePosRef, svgControls])
 
   return (
-    <div 
+    <div
+      ref={wrapperRef}
       className="pointer-events-none fixed inset-0 z-[100] overflow-hidden"
       style={{ pointerEvents: 'none' }}
     >
