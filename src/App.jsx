@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import {
   Droplet, Check, X, Sofa,
@@ -12,68 +12,42 @@ import ActionCard from './components/ActionCard'
 import KinetiCalmCursor from './components/KinetiCalmCursor'
 import useFaceTracking from './hooks/useFaceTracking'
 
-/**
- * Utility function to synthesize speech.
- * Kept outside the component so it doesn't recreate on re-renders.
- */
-function speakText(text) {
-  if (!('speechSynthesis' in window)) {
-    console.warn("Web Speech API not supported in this browser.")
-    return
-  }
-
-  window.speechSynthesis.cancel()
-
-  const utterance = new SpeechSynthesisUtterance(text)
-  utterance.rate = 0.9
-  utterance.pitch = 1
-
-  const voices = window.speechSynthesis.getVoices()
-  const clearVoice = voices.find((v) => v.lang.startsWith('en-') && v.name.includes('Google')) || voices[0]
-  if (clearVoice) {
-    utterance.voice = clearVoice
-  }
-
-  window.speechSynthesis.speak(utterance)
-}
-
 /* ── Initial AAC State ── */
 const INITIAL_AAC_CARDS = [
-  { id: 1, text: 'I need water', icon: Droplet, accentColor: 'cyan' },
-  { id: 2, text: 'Yes', icon: Check, accentColor: 'emerald' },
-  { id: 3, text: 'No', icon: X, accentColor: 'rose' },
-  { id: 4, text: 'Please adjust my chair', icon: Sofa, accentColor: 'violet' },
-  { id: 5, text: 'I want to rest', icon: Bed, accentColor: 'sky' },
-  { id: 6, text: 'I am in pain', icon: Activity, accentColor: 'rose' },
-  { id: 7, text: 'Call caregiver', icon: BellRing, accentColor: 'amber' },
-  { id: 8, text: 'Thank you', icon: Heart, accentColor: 'emerald' },
+  { id: 1, text: 'I need water',          icon: Droplet,  accentColor: 'cyan'    },
+  { id: 2, text: 'Yes',                   icon: Check,    accentColor: 'emerald' },
+  { id: 3, text: 'No',                    icon: X,        accentColor: 'rose'    },
+  { id: 4, text: 'Please adjust my chair',icon: Sofa,     accentColor: 'violet'  },
+  { id: 5, text: 'I want to rest',        icon: Bed,      accentColor: 'sky'     },
+  { id: 6, text: 'I am in pain',          icon: Activity, accentColor: 'rose'    },
+  { id: 7, text: 'Call caregiver',        icon: BellRing, accentColor: 'amber'   },
+  { id: 8, text: 'Thank you',             icon: Heart,    accentColor: 'emerald' },
 ]
 
 /* ── Animation variants for staggered card entrance ── */
 const containerVariants = {
   hidden: {},
   visible: {
-    transition: {
-      staggerChildren: 0.07,
-      delayChildren: 0.15,
-    },
+    transition: { staggerChildren: 0.07, delayChildren: 0.15 },
   },
 }
 
 const cardVariants = {
-  hidden: { opacity: 0, y: 24, scale: 0.96 },
+  hidden:  { opacity: 0, y: 24, scale: 0.96 },
   visible: {
-    opacity: 1,
-    y: 0,
-    scale: 1,
+    opacity: 1, y: 0, scale: 1,
     transition: { type: 'spring', stiffness: 260, damping: 24 },
   },
 }
 
 export default function App() {
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
-  const [aacCards] = useState(INITIAL_AAC_CARDS)
-  const [isCameraLoading, setIsCameraLoading] = useState(false)
+  const [sidebarCollapsed,    setSidebarCollapsed]    = useState(false)
+  const [aacCards]                                    = useState(INITIAL_AAC_CARDS)
+  const [isCameraLoading,     setIsCameraLoading]     = useState(false)
+
+  // ── Accessibility feature toggles ──────────────────────────────────────────
+  const [isTremorFilterOn, setIsTremorFilterOn] = useState(true)
+  const [isVoiceOutputOn,  setIsVoiceOutputOn]  = useState(true)
 
   // Hardware Tracking Setup
   const videoRef = useRef(null)
@@ -86,41 +60,64 @@ export default function App() {
     setIsCameraLoading(false)
   }
 
-  // 🧪 [TESTING BACKDOOR] Expose synthetic coordinate overriding to Playwright
+  /**
+   * speakText — moved inside the component so it can close over isVoiceOutputOn.
+   * Wrapped in useCallback so handleCardClick's reference stays stable.
+   */
+  const speakText = useCallback((text) => {
+    if (!isVoiceOutputOn) return                    // ← voice off: bail immediately
+    if (!('speechSynthesis' in window)) {
+      console.warn('Web Speech API not supported in this browser.')
+      return
+    }
+
+    window.speechSynthesis.cancel()
+
+    const utterance = new SpeechSynthesisUtterance(text)
+    utterance.rate  = 0.9
+    utterance.pitch = 1
+
+    const voices     = window.speechSynthesis.getVoices()
+    const clearVoice = voices.find((v) => v.lang.startsWith('en-') && v.name.includes('Google')) || voices[0]
+    if (clearVoice) utterance.voice = clearVoice
+
+    window.speechSynthesis.speak(utterance)
+  }, [isVoiceOutputOn])
+
+  // Handlers
+  const handleCardClick = useCallback((text) => {
+    console.log(`AAC Triggered: ${text}`)
+    speakText(text)
+  }, [speakText])
+
+  // Testing backdoor — expose synthetic coordinate overriding to Playwright
   useEffect(() => {
-    // Only expose this globally in development builds for security
     if (import.meta.env.MODE !== 'production') {
       window.forceCursorPosition = (viewportX, viewportY) => {
-        // Playwright inputs raw screen pixels. We must calculate the inverse math
-        // to pass MediaPipe's normalized [0,1] format back into your KinetiCalmCursor.
-        // Because X is inverted/mirrored: screenX = (1 - x) * window.innerWidth
         const rawX = 1 - (viewportX / window.innerWidth)
         const rawY = viewportY / window.innerHeight
-        
         nosePosRef.current = { x: rawX, y: rawY }
       }
     }
-    
     return () => delete window.forceCursorPosition
   }, [nosePosRef])
 
-  // Handlers
-  const handleCardClick = (text) => {
-    console.log(`AAC Triggered: ${text}`)
-    speakText(text)
-  }
-
   return (
     <div className="flex h-screen w-screen bg-gray-950 overflow-hidden" id="app-root">
-      {/* ── Video feed is now handled organically inside WebcamFeed.jsx ── */}
-
       {/* ── The Custom Dwell-to-Click Cursor ── */}
-      <KinetiCalmCursor nosePosRef={nosePosRef} />
+      <KinetiCalmCursor
+        nosePosRef={nosePosRef}
+        isTremorFilterOn={isTremorFilterOn}
+      />
 
       {/* ── Sidebar ── */}
       <Sidebar
         collapsed={sidebarCollapsed}
         onToggle={() => setSidebarCollapsed((c) => !c)}
+        isTremorFilterOn={isTremorFilterOn}
+        setIsTremorFilterOn={setIsTremorFilterOn}
+        isVoiceOutputOn={isVoiceOutputOn}
+        setIsVoiceOutputOn={setIsVoiceOutputOn}
       />
 
       {/* ── Main content column ── */}
@@ -175,10 +172,7 @@ export default function App() {
 
           {/* ── Section 2: Action cards grid ── */}
           <section aria-labelledby="actions-section-heading">
-            <h2
-              id="actions-section-heading"
-              className="sr-only"
-            >
+            <h2 id="actions-section-heading" className="sr-only">
               Action Cards
             </h2>
 
@@ -191,11 +185,7 @@ export default function App() {
               aria-label="Available actions"
             >
               {aacCards.map((card) => (
-                <motion.div
-                  key={card.id}
-                  variants={cardVariants}
-                  role="listitem"
-                >
+                <motion.div key={card.id} variants={cardVariants} role="listitem">
                   <ActionCard
                     icon={card.icon}
                     label={card.text}
@@ -208,21 +198,20 @@ export default function App() {
             </motion.div>
           </section>
 
-          {/* ── Accessibility status footer bar ── */}
+          {/* ── Accessibility status footer bar (wired to live state) ── */}
           <div
-            className="flex flex-wrap items-center gap-3 p-4 rounded-2xl
-                        bg-gray-900/60 border border-gray-800"
+            className="flex flex-wrap items-center gap-3 p-4 rounded-2xl bg-gray-900/60 border border-gray-800"
             role="status"
             aria-live="polite"
             aria-label="Accessibility status"
           >
             <span className="text-sm font-semibold text-gray-400">Active Aids:</span>
             {[
-              { label: 'Tremor Filter', on: true },
-              { label: 'High Contrast', on: true },
-              { label: 'Large Targets', on: true },
-              { label: 'Gaze Tracking', on: false },
-              { label: 'Voice Output', on: false },
+              { label: 'Tremor Filter', on: isTremorFilterOn },
+              { label: 'High Contrast', on: true             },
+              { label: 'Large Targets', on: true             },
+              { label: 'Gaze Tracking', on: false            },
+              { label: 'Voice Output',  on: isVoiceOutputOn  },
             ].map(({ label, on }) => (
               <span
                 key={label}

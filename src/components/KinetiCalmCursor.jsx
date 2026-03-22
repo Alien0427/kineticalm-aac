@@ -6,9 +6,10 @@ import { motion, useAnimation } from 'framer-motion'
  * It demonstrates a Simple Moving Average (SMA) algorithm to smooth out motor tremors.
  * Now equipped with "Dwell-to-Click" logic using document.elementFromPoint.
  * 
- * @param {React.MutableRefObject} nosePosRef - A ref containing normalized {x, y} coordinates.
+ * @param {React.MutableRefObject} nosePosRef    - A ref containing normalized {x, y} coordinates.
+ * @param {boolean}                isTremorFilterOn - When false, bypasses SMA and uses raw coordinates.
  */
-export default function KinetiCalmCursor({ nosePosRef }) {
+export default function KinetiCalmCursor({ nosePosRef, isTremorFilterOn = true }) {
   // DOM Refs
   const wrapperRef      = useRef(null)   // outermost overlay — hidden during hit-test
   const smoothCursorRef = useRef(null)
@@ -26,8 +27,21 @@ export default function KinetiCalmCursor({ nosePosRef }) {
   const DWELL_TIME_MS = 1500
 
   // Framer Motion controls for the dynamic SVG progress ring
-  const svgControls = useAnimation()
+  const svgControls  = useAnimation()
   const CIRCUMFERENCE = 164 // ~ 2 * pi * 26 (radius)
+
+  // Store isTremorFilterOn in a ref so the rAF loop always reads the latest
+  // value without needing to be in the effect's dependency array.
+  const isTremorFilterOnRef = useRef(isTremorFilterOn)
+  useEffect(() => {
+    isTremorFilterOnRef.current = isTremorFilterOn
+    // When the filter is switched off, clear SMA history so there's no
+    // 'jump' from a stale average when it's toggled back on later.
+    if (!isTremorFilterOn) {
+      historyX.current = []
+      historyY.current = []
+    }
+  }, [isTremorFilterOn])
 
   useEffect(() => {
     let animationFrameId
@@ -46,22 +60,27 @@ export default function KinetiCalmCursor({ nosePosRef }) {
       const screenX = (1 - x) * window.innerWidth
       const screenY = y * window.innerHeight
 
-      // 1. Raw Cursor
+      // 1. Raw Cursor (always shows the unsmoothed position for comparison)
       if (rawCursorRef.current) {
         rawCursorRef.current.style.transform = `translate3d(${screenX}px, ${screenY}px, 0) translate(-50%, -50%)`
       }
 
-      // 2. SMA Algorithm
-      historyX.current.push(screenX)
-      historyY.current.push(screenY)
+      // 2. SMA Algorithm — only runs when Tremor Filter is enabled
+      let avgX = screenX
+      let avgY = screenY
 
-      if (historyX.current.length > HISTORY_SIZE) {
-        historyX.current.shift()
-        historyY.current.shift()
+      if (isTremorFilterOnRef.current) {
+        historyX.current.push(screenX)
+        historyY.current.push(screenY)
+
+        if (historyX.current.length > HISTORY_SIZE) {
+          historyX.current.shift()
+          historyY.current.shift()
+        }
+
+        avgX = historyX.current.reduce((sum, val) => sum + val, 0) / historyX.current.length
+        avgY = historyY.current.reduce((sum, val) => sum + val, 0) / historyY.current.length
       }
-
-      const avgX = historyX.current.reduce((sum, val) => sum + val, 0) / historyX.current.length
-      const avgY = historyY.current.reduce((sum, val) => sum + val, 0) / historyY.current.length
 
       // 3. Smoothed Cursor
       if (smoothCursorRef.current) {
